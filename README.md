@@ -1,1 +1,1 @@
-# Coupling Audio Denoising and Bandwidth Extension
+# Bandwidth Extension
