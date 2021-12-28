@@ -35,6 +35,7 @@ METRICS_KEY_EVALUATION_LOSS = 'evaluation_loss'
 METRICS_KEY_BEST_LOSS = 'best_loss'
 METRICS_KEY_PESQ = 'total pesq'
 METRICS_KEY_STOI = 'total stoi'
+METRICS_KEY_LSD = 'total lsd'
 
 
 class Solver(object):
@@ -175,9 +176,9 @@ class Solver(object):
 
                 generator = self.batch_solver.get_generator_for_evaluation(self.best_states)
                 with torch.no_grad():
-                    pesq, stoi = evaluate(self.args, generator, self.tt_loader, epoch)
+                    pesq, stoi, lsd = evaluate(self.args, generator, self.tt_loader, epoch)
 
-                    metrics.update({METRICS_KEY_PESQ: pesq, METRICS_KEY_STOI: stoi})
+                    metrics.update({METRICS_KEY_PESQ: pesq, METRICS_KEY_STOI: stoi, METRICS_KEY_LSD: lsd})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')

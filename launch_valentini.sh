@@ -8,6 +8,7 @@
 
 python train.py \
   dset=valentini \
-  experiment=example_file \
+  experiment=initial \
   experiment.scale_factor=2 \
+
 

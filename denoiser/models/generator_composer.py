@@ -1,14 +1,12 @@
 from torch import nn
 
-from denoiser.models.dataclasses import FeaturesConfig
 from denoiser.utils import capture_init
 
 
-class Autoencoder(nn.Module):
+class GeneratorComposer(nn.Module):
 
     @capture_init
-    def __init__(self, encoder, attention_module, decoder, skips, normalize, floor=1e-3,
-                 include_ft_in_output=False, get_ft_after_attn_module=False):
+    def __init__(self, encoder, attention_module, decoder, skips, normalize, floor=1e-3):
         super().__init__()
         self.encoder = encoder
         self.attention_module = attention_module
@@ -16,8 +14,6 @@ class Autoencoder(nn.Module):
         self.skips = skips
         self.floor = floor
         self.normalize = normalize
-        self.include_features_in_output = include_ft_in_output
-        self.post_attn = get_ft_after_attn_module
 
     def estimate_output_length(self, input_length):
         encoder_output_length = self.encoder.estimate_output_length(input_length)
@@ -42,6 +38,4 @@ class Autoencoder(nn.Module):
             post_attn = self.attention_module(pre_attn)
             out = self.decoder(post_attn)
 
-        if self.include_features_in_output:
-            return std*out, post_attn if self.post_attn else pre_attn
         return std * out

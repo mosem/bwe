@@ -15,7 +15,7 @@ from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
 
-WANDB_PROJECT_NAME = 'Coupling Speech Denoising and Bandwidth Extension'
+WANDB_PROJECT_NAME = 'Bandwidth Extension'
 WANDB_ENTITY = 'huji-dl-audio-lab'
 
 def run(args):

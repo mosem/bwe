@@ -15,6 +15,7 @@ import wandb
 from pesq import pesq
 from pystoi import stoi
 import torch
+from .stft_loss import stft
 
 from .enhance import get_estimate
 from . import distrib
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 def evaluate(args, model, data_loader, epoch):
     total_pesq = 0
     total_stoi = 0
+    total_lsd = 0
     total_cnt = 0
     updates = 5
     model.eval()
@@ -59,19 +61,20 @@ def evaluate(args, model, data_loader, epoch):
                 total_cnt += clean.shape[0]
 
         for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
-            pesq_i, stoi_i, snr_i, estimate_i, filename_i = pending.result()
+            pesq_i, stoi_i, snr_i, lsd_i, estimate_i, filename_i = pending.result()
             if filename_i in files_to_log:
-                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, filename_i, epoch, args.experiment.sample_rate)
+                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, lsd_i, filename_i, epoch, args.experiment.sample_rate)
             total_pesq += pesq_i
             total_stoi += stoi_i
+            total_lsd += lsd_i
 
-    metrics = [total_pesq, total_stoi]
-    avg_pesq, avg_stoi = distrib.average([m/total_cnt for m in metrics], total_cnt)
-    logger.info(bold(f'Test set performance:PESQ={avg_pesq}, STOI={avg_stoi}.'))
-    return avg_pesq, avg_stoi
+    metrics = [total_pesq, total_stoi, total_lsd]
+    avg_pesq, avg_stoi, avg_lsd = distrib.average([m/total_cnt for m in metrics], total_cnt)
+    logger.info(bold(f'Test set performance:PESQ={avg_pesq}, STOI={avg_stoi}, LSD={avg_lsd}.'))
+    return avg_pesq, avg_stoi, avg_lsd
 
 
-def log_to_wandb(signal, pesq, stoi, snr, filename, epoch, sr):
+def log_to_wandb(signal, pesq, stoi, snr, lsd, filename, epoch, sr):
     spectrogram_transform = Spectrogram()
     enhanced_spectrogram = spectrogram_transform(signal).log2()[0, :, :].numpy()
     enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram), caption=filename)
@@ -79,6 +82,7 @@ def log_to_wandb(signal, pesq, stoi, snr, filename, epoch, sr):
     wandb.log({f'test samples/{filename}/pesq': pesq,
                f'test samples/{filename}/stoi': stoi,
                f'test samples/{filename}/snr': snr,
+               f'test samples/{filename}/lsd': lsd,
                f'test samples/{filename}/spectrogram': enhanced_spectrogram_wandb_image,
                f'test samples/{filename}/audio': enhanced_wandb_audio},
               step=epoch)
@@ -92,17 +96,20 @@ def estimate_and_run_metrics(clean, model, noisy, args, filename, include_ft=Fal
 
 def run_metrics(clean, estimate, noisy_len, args, filename):
     clean, estimate = pad_signals_to_noisy_length(clean, noisy_len, estimate)
-    pesq, stoi, snr = get_metrics(clean, estimate, args.experiment.sample_rate)
-    return pesq, stoi, snr, estimate, filename
+    pesq, stoi, snr, lsd = get_metrics(clean, estimate, args.experiment.sample_rate)
+    return pesq, stoi, snr, lsd, estimate, filename
 
 
 def get_metrics(clean, estimate, sr):
-    estimate_numpy = estimate.numpy()[:, 0]
-    clean_numpy = clean.numpy()[:, 0]
+    clean = clean.squeeze(dim=1)
+    estimate = estimate.squeeze(dim=1)
+    estimate_numpy = estimate.numpy()
+    clean_numpy = clean.numpy()
     pesq = get_pesq(clean_numpy, estimate_numpy, sr=sr)
     stoi = get_stoi(clean_numpy, estimate_numpy, sr=sr)
-    snr = get_snr(estimate, estimate - clean).item()
-    return pesq, stoi, snr
+    snr = get_snr(estimate, clean).item()
+    lsd = get_lsd(estimate, clean).item()
+    return pesq, stoi, snr, lsd
 
 
 def get_pesq(ref_sig, out_sig, sr):
@@ -134,8 +141,52 @@ def get_stoi(ref_sig, out_sig, sr):
     return stoi_val
 
 
-def get_snr(signal, noise):
-    return (signal**2).mean()/(noise**2).mean()
+# def get_snr(signal, clean):
+#     noise = clean - signal
+#     return (signal**2).mean()/(noise**2).mean()
+
+
+# get_snr and get_lsd are taken from: https://github.com/nanahou/metric/blob/master/measure_SNR_LSD.py
+
+def get_snr(x, y):
+    """
+       Compute SNR (signal to noise ratio)
+       Arguments:
+           x: vector (torch.Tensor), enhanced signal [B,T]
+           y: vector (torch.Tensor), reference signal(ground truth) [B,T]
+    """
+    ref = torch.pow(y, 2)
+    diff = torch.pow(x - y, 2)
+
+    ratio = torch.sum(ref,dim=-1) / torch.sum(diff, dim=-1)
+    value = 10 * torch.log10(ratio)
+
+    return value
+
+
+def get_lsd(x, y):
+    """
+       Compute LSD (log spectral distance)
+       Arguments:
+           x: vector (torch.Tensor), enhanced signal [B,T]
+           y: vector (torch.Tensor), reference signal(ground truth) [B,T]
+    """
+
+    fft_size = 1024
+    shift_size = 120
+    win_length = 600
+    window = torch.hann_window(win_length)
+
+    X = stft(x, fft_size, shift_size, win_length, window)
+    Y = stft(y, fft_size, shift_size, win_length, window)
+
+
+    diff = torch.pow(X - Y, 2)
+
+    sum_freq = torch.sqrt(torch.sum(diff, dim=-1) / diff.size(-1))
+    value = torch.sum(sum_freq, dim=-1) / sum_freq.size(-1)
+
+    return value
 
 
 def upsample_noisy(args, noisy):

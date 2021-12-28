@@ -22,6 +22,7 @@ RESULTS_DF_NOISY_SNR = 'noisy snr'
 RESULTS_DF_ENHANCED_SNR = 'enhanced snr'
 RESULTS_DF_PESQ = 'pesq'
 RESULTS_DF_STOI = 'stoi'
+RESULTS_DF_LSD = 'lsd'
 
 HISTOGRAM_DF_RANGE = 'range'
 HISTOGRAM_DF_N_SAMPLES = 'n_samples'
@@ -36,7 +37,7 @@ WANDB_CUSTOM_CHART_NAME = "huji-dl-audio-lab/non-sorted-bar-chart"
 def create_results_df(args):
     wandb_table = init_wandb_table()
     df = pd.DataFrame(columns=[RESULTS_DF_FILENAME, RESULTS_DF_NOISY_SNR, RESULTS_DF_ENHANCED_SNR, RESULTS_DF_PESQ,
-                               RESULTS_DF_STOI])
+                               RESULTS_DF_STOI, RESULTS_DF_LSD])
     files = find_audio_files(args.samples_dir, progress=False)
     clean_paths = [str(data[0]) for data in files if '_clean' in str(data[0])]
     noisy_paths = [str(data[0]) for data in files if '_noisy' in str(data[0])]
@@ -54,12 +55,12 @@ def create_results_df(args):
 
         clean, enhanced = pad_signals_to_noisy_length(clean, noisy.shape[-1], enhanced)
 
-        noisy_snr = get_snr(noisy, noisy - clean).item()
-        pesq, stoi, enhanced_snr = get_metrics(clean, enhanced, args.experiment.sample_rate)
+        noisy_snr = get_snr(noisy, clean).item()
+        pesq, stoi, enhanced_snr, lsd = get_metrics(clean, enhanced, args.experiment.sample_rate)
 
         filename = os.path.basename(clean_path).rstrip('_clean.wav')
-        df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi]
-        add_data_to_wandb_table((clean, noisy, enhanced), (pesq, stoi), filename, args, wandb_table)
+        df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi, lsd]
+        add_data_to_wandb_table((clean, noisy, enhanced), (pesq, stoi, lsd), filename, args, wandb_table)
 
     wandb.log({"Results": wandb_table})
     return df
@@ -134,7 +135,7 @@ def log_results(args):
 
 def init_wandb_table():
     columns = ['filename', 'clean audio', 'clean spectogram', 'noisy audio', 'noisy spectogram', 'enhanced audio',
-               'enhanced spectogram', 'noisy snr', 'enhanced snr', 'pesq', 'stoi']
+               'enhanced spectogram', 'noisy snr', 'enhanced snr', 'pesq', 'stoi', 'lsd']
     table = wandb.Table(columns=columns)
     return table
 
@@ -150,9 +151,9 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
     clean_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(clean_spectrogram))
     noisy_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(noisy_spectrogram))
     enhaced_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram))
-    pesq, stoi = metrics
-    noisy_snr = get_snr(noisy, noisy - clean).item()
-    enhanced_snr = get_snr(enhanced, enhanced - clean).item()
+    pesq, stoi, lsd = metrics
+    noisy_snr = get_snr(noisy, clean).item()
+    enhanced_snr = get_snr(enhanced, clean).item()
 
     clean_sr = args.experiment.sample_rate
 
@@ -161,4 +162,4 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
     enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_enhanced')
 
     wandb_table.add_data(filename, clean_wandb_audio, clean_wandb_spec, noisy_wandb_audio, noisy_wandb_spec,
-                         enhanced_wandb_audio, enhaced_wandb_spec, noisy_snr, enhanced_snr, pesq, stoi)
+                         enhanced_wandb_audio, enhaced_wandb_spec, noisy_snr, enhanced_snr, pesq, stoi, lsd)

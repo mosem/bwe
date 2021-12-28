@@ -13,8 +13,8 @@ GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
 
 class GeneratorBS(BatchSolver):
 
-    def __init__(self, args, generator, features_config: FeaturesConfig=None):
-        super(GeneratorBS, self).__init__(args, features_config)
+    def __init__(self, args, generator):
+        super(GeneratorBS, self).__init__(args)
         self.device = args.device
 
         if torch.cuda.is_available() and args.device == 'cuda':
@@ -53,20 +53,13 @@ class GeneratorBS(BatchSolver):
         loss.backward()
         self._optimizers[GENERATOR_OPTIMIZER_KEY].step()
 
-    def _get_loss(self, clean, prediction):
-        if self.include_ft:
-            estimate, latent_signal = prediction
-
-        else:
-            estimate, latent_signal = prediction, None
-        loss = self.get_features_loss(latent_signal, clean)
+    def _get_loss(self, clean, estimate):
+        loss = 0
         with torch.autograd.set_detect_anomaly(True):
             if self.args.loss == 'l1':
                 loss += F.l1_loss(clean, estimate)
             elif self.args.loss == 'l2':
                 loss += F.mse_loss(clean, estimate)
-            elif self.args.loss == 'huber':
-                loss += F.smooth_l1_loss(clean, estimate)
             else:
                 raise ValueError(f"Invalid loss {self.args.loss}")
             # MultiResolution STFT loss
