@@ -1,0 +1,15 @@
+# @package experiment
+experiment_name: initial
+
+# Dataset related
+sample_rate: 16000 # target sample rate #should be included in training cfg
+source_sample_rate: 16000 # source sample rate, added to support BWE #should be included in training cfg
+segment: 2
+stride: 2    # in seconds, how much to stride between training examples
+pad: true   # if training sample is too short, pad it
+batch_size: 16
+
+scale_factor: 2
+
+# models related
+model: dummy
