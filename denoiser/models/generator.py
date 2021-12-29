@@ -53,8 +53,9 @@ class LowPassModule(nn.Module):
         super().__init__()
 
     def forward(self, signal):
-        bias = torch.zeros_like(signal, requires_grad=True)
-        return signal + bias
+        # bias = torch.zeros_like(signal, requires_grad=True)
+        bias = torch.ones_like(signal, requires_grad=True)
+        return signal + bias*torch.pow(signal,2)
 
 
 class HighPassModule(nn.Module):

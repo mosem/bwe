@@ -8,7 +8,7 @@
 
 python train.py \
   dset=valentini \
+  experiment.experiment_name=relative_low_pass_module_pow \
   experiment=initial \
   experiment.scale_factor=2 \
-
 
