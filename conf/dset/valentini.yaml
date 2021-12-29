@@ -1,8 +1,8 @@
 # @package dset
-train: egs/valentini/16k/tr
-valid: egs/valentini/16k/cv
-test: egs/valentini/16k/tt
-noisy_json: egs/valentini/16k/tt/noisy.json
+train: egs/valentini/8k-16k/tr
+valid: egs/valentini/8k-16k/cv
+test: egs/valentini/8k-16k/tt
+noisy_json: egs/valentini/8k-16k/tt/noisy.json
 noisy_dir:
 matching: sort
 pesq: 1

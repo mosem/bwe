@@ -109,10 +109,12 @@ class NoisyCleanSet:
             clean = json.load(f)
 
         match_files(noisy, clean, matching)
-        kw = {'length': self.valid_length, 'stride': stride, 'pad': pad, 'with_path': with_path}
-        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw, mel_config=mel_config)
-        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw, mel_config=mel_config)
+        kw = {'stride': stride, 'pad': pad, 'with_path': with_path}
+        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw, length=self.valid_length ,mel_config=mel_config)
+        self.noisy_set = Audioset(noisy, sample_rate=sample_rate/self.scale_factor, length=self.valid_length/self.scale_factor, **kw, mel_config=mel_config)
 
+
+        logger.info(f'len clean: {len(self.clean_set)}, len noisy: {len(self.noisy_set)}')
         assert len(self.clean_set) == len(self.noisy_set)
 
     def _process_data(self, noisy, clean):
@@ -120,13 +122,13 @@ class NoisyCleanSet:
             noisy = pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
             clean = pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
 
-        if self.scale_factor == 2:
-            noisy = downsample2(noisy)
-        elif self.scale_factor == 4:
-            noisy = downsample2(noisy)
-            noisy = downsample2(noisy)
-        elif self.scale_factor != 1:
-            raise RuntimeError(f"Scale factor should be 1, 2, or 4")
+        # if self.scale_factor == 2:
+        #     noisy = downsample2(noisy)
+        # elif self.scale_factor == 4:
+        #     noisy = downsample2(noisy)
+        #     noisy = downsample2(noisy)
+        # elif self.scale_factor != 1:
+        #     raise RuntimeError(f"Scale factor should be 1, 2, or 4")
 
         return noisy, clean
 
