@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.dataclasses import FeaturesConfig
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 

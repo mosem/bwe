@@ -28,6 +28,7 @@ HISTOGRAM_DF_RANGE = 'range'
 HISTOGRAM_DF_N_SAMPLES = 'n_samples'
 HISTOGRAM_DF_AVG_PESQ = 'avg pesq'
 HISTOGRAM_DF_AVG_STOI = 'avg stoi'
+HISTOGRAM_DF_AVG_LSD = 'avg lsd'
 
 DEFAULT_HISTOGRAM_MAX_SNR = 40.0
 
@@ -77,7 +78,7 @@ def get_histogram_intervals(max_snr_value, n_bins):
 
 def create_results_histogram_df(results_df, n_bins):
     results_histogram_df = pd.DataFrame(columns=[HISTOGRAM_DF_RANGE, HISTOGRAM_DF_N_SAMPLES, HISTOGRAM_DF_AVG_PESQ,
-                                                 HISTOGRAM_DF_AVG_STOI])
+                                                 HISTOGRAM_DF_AVG_STOI, HISTOGRAM_DF_AVG_LSD])
     noisy_snr_values = results_df[RESULTS_DF_NOISY_SNR]
     bin_indices, bins = pd.cut(noisy_snr_values, get_histogram_intervals(noisy_snr_values.max(), n_bins),
                                labels=False, retbins=True, right=False)
@@ -85,6 +86,7 @@ def create_results_histogram_df(results_df, n_bins):
     n_samples_per_bin = []
     wandb_pesq = []
     wandb_stoi = []
+    wandb_lsd = []
     total_n_samples = 0
     for i in range(len(bins)-1):
         bin_range = (float("{:.2f}".format(bins[i])), float("{:.2f}".format(bins[i + 1])))
@@ -94,17 +96,23 @@ def create_results_histogram_df(results_df, n_bins):
         total_n_samples += n_samples_per_bin_i
         bin_avg_pesq = results_df.pesq[bin_indices == i].mean()
         bin_avg_stoi = results_df.stoi[bin_indices == i].mean()
+        bin_avg_lsd = results_df.lsd[bin_indices == i].mean()
         bin_avg_pesq = 0 if math.isnan(bin_avg_pesq) else bin_avg_pesq
         bin_avg_stoi = 0 if math.isnan(bin_avg_stoi) else bin_avg_stoi
+        bin_avg_lsd = 0 if math.isnan(bin_avg_lsd) else bin_avg_lsd
         wandb_pesq.append(bin_avg_pesq)
         wandb_stoi.append(bin_avg_stoi)
-        results_histogram_df.loc[i] = [bin_range, n_samples_per_bin_i, bin_avg_pesq, bin_avg_stoi]
+        wandb_lsd.append(bin_avg_lsd)
+        results_histogram_df.loc[i] = [bin_range, n_samples_per_bin_i, bin_avg_pesq, bin_avg_stoi, bin_avg_lsd]
     log_wandb_bar_chart([[wandb_range, pesq, n_samples_per_bin_i] for (wandb_range, pesq, n_samples_per_bin_i)
                                                                 in zip(wandb_ranges, wandb_pesq, n_samples_per_bin)],
                         ['ranges', 'pesq', 'n_samples_per_bin_i'], 'pesq_table', 'Average PESQ per SNR range')
     log_wandb_bar_chart([[wandb_range, stoi, n_samples_per_bin_i] for (wandb_range, stoi, n_samples_per_bin_i)
                                                                 in zip(wandb_ranges, wandb_stoi, n_samples_per_bin)],
                         ['ranges', 'stoi', 'n_samples_per_bin_i'], 'stoi_table', 'Average STOI per SNR range')
+    log_wandb_bar_chart([[wandb_range, lsd, n_samples_per_bin_i] for (wandb_range, lsd, n_samples_per_bin_i)
+                         in zip(wandb_ranges, wandb_lsd, n_samples_per_bin)],
+                        ['ranges', 'lsd', 'n_samples_per_bin_i'], 'lsd_table', 'Average LSD per SNR range')
     return results_histogram_df
 
 

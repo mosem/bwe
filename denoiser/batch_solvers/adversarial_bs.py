@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.generator_bs import GeneratorBS
-from denoiser.models.dataclasses import FeaturesConfig
 
 GENERATOR_KEY = 'generator'
 DISCRIMINATOR_KEY = 'discriminator'
@@ -11,8 +10,8 @@ DISCRIMINATOR_OPTIMIZER_KEY = 'discriminator_optimizer'
 
 class AdversarialBS(GeneratorBS):
 
-    def __init__(self, args, generator, discriminator, features_config: FeaturesConfig=None):
-        super().__init__(args, generator, features_config)
+    def __init__(self, args, generator, discriminator):
+        super().__init__(args, generator)
         if torch.cuda.is_available():
             discriminator.cuda()
         self._models.update({DISCRIMINATOR_KEY: discriminator})
@@ -29,14 +28,7 @@ class AdversarialBS(GeneratorBS):
         generator = self._models[GENERATOR_KEY]
         discriminator = self._models[DISCRIMINATOR_KEY]
 
-        prediction = generator(noisy)
-
-        # get features regularization loss if specified
-        if self.include_ft:
-            estimate, latent_signal = prediction
-        else:
-            estimate, latent_signal = prediction, None
-        features_loss = self.get_features_loss(latent_signal , clean)
+        estimate = generator(noisy)
 
         if epoch >= self.disc_first_epoch:
             discriminator_fake_detached = discriminator(estimate.detach())
@@ -47,7 +39,7 @@ class AdversarialBS(GeneratorBS):
 
 
 
-            total_loss_generator = features_loss + self._get_total_generator_loss(discriminator_fake, discriminator_real)
+            total_loss_generator = self._get_total_generator_loss(discriminator_fake, discriminator_real)
 
             losses_dict = {self._losses_names[0]: total_loss_generator.item(), self._losses_names[1]: loss_discriminator.item()}
 
@@ -55,7 +47,7 @@ class AdversarialBS(GeneratorBS):
 
         # train all epochs before disc_first_epoch simply with an l1/l2/huber loss
         else:
-            loss = super()._get_loss(clean, prediction)
+            loss = super()._get_loss(clean)
             losses_dict = {self._losses_names[0]: loss.item(), self._losses_names[1]: 0}
             losses = (loss, 0)
 

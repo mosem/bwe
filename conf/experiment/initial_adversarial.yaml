@@ -1,0 +1,25 @@
+# @package experiment
+experiment_name: initial_adversarial
+
+# Dataset related
+sample_rate: 16000 # target sample rate #should be included in training cfg
+source_sample_rate: 16000 # source sample rate, added to support BWE #should be included in training cfg
+segment: 2
+stride: 2    # in seconds, how much to stride between training examples
+pad: true   # if training sample is too short, pad it
+batch_size: 16
+
+scale_factor: 2
+
+# models related
+model: dummy
+
+
+adversarial: True
+discriminator_model: standard # standard/laplacian
+features_loss_lambda: 100
+discriminator:
+  n_layers: 4
+  num_D: 3
+  downsampling_factor: 4
+  ndf: 16
