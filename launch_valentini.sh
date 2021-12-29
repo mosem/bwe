@@ -8,6 +8,7 @@
 
 python train.py \
   dset=valentini \
+  experiment.experiment_name=multi-channel-valentini \
   experiment=initial \
   experiment.scale_factor=2 \
 
