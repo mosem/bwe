@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import torch
 from torch.utils.data import DataLoader
 import argparse
 from torchaudio.transforms import Resample
@@ -9,7 +10,6 @@ from denoiser.evaluate import get_pesq, get_stoi
 from concurrent.futures import ThreadPoolExecutor
 import torchaudio
 from torch.nn import functional as F
-from denoiser.resample import downsample2
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--path_to_json_dir")
@@ -28,9 +28,37 @@ def match_files(noisy, clean, matching="sort"):
     clean.sort()
 
 
+def kernel_downsample2(zeros=56):
+    """kernel_downsample2.
+
+    """
+    win = torch.hann_window(4 * zeros + 1, periodic=False)
+    winodd = win[1::2]
+    t = torch.linspace(-zeros + 0.5, zeros - 0.5, 2 * zeros)
+    t.mul_(math.pi)
+    kernel = (torch.sinc(t) * winodd).view(1, 1, -1)
+    return kernel
+
+
+def downsample2(x, zeros=56):
+    """
+    Downsampling the input by 2 using sinc interpolation.
+    Smith, Julius, and Phil Gossett. "A flexible sampling-rate conversion method."
+    ICASSP'84. IEEE International Conference on Acoustics, Speech, and Signal Processing.
+    Vol. 9. IEEE, 1984.
+    """
+    if x.shape[-1] % 2 != 0:
+        x = F.pad(x, (0, 1))
+    xeven = x[..., ::2]
+    xodd = x[..., 1::2]
+    *other, time = xodd.shape
+    kernel = kernel_downsample2(zeros).to(x)
+    out = xeven + F.conv1d(xodd.view(-1, 1, time), kernel, padding=zeros)[..., :-1].view(
+        *other, time)
+    return out.view(*other, -1).mul(0.5)
+
 class Audioset:
-    def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None, mel_config=None):
+    def __init__(self, files=None, length=None, stride=None,pad=True, sample_rate=None):
         """
         files should be a list [(file, length)]
         """
@@ -38,14 +66,7 @@ class Audioset:
         self.num_examples = []
         self.stride = stride or length
         self.length = length
-        self.with_path = with_path
         self.sample_rate = sample_rate
-        self.use_mel = mel_config.use_melspec if mel_config is not None else False
-        if self.use_mel:
-            self.mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate=mel_config.sample_rate,
-                                                                 n_fft=mel_config.n_fft,
-                                                                 n_mels=mel_config.n_mels,
-                                                                 hop_length=mel_config.hop_length)
 
         for file, file_length in self.files:
             if length is None:
@@ -84,19 +105,12 @@ class Audioset:
                                        f"{self.sample_rate}, but got {sr}")
             if num_frames:
                 out = F.pad(out, (0, num_frames - out.shape[-1]))
-            if self.use_mel:
-                if len(out.shape) == 3:
-                    out = out.squeeze(1)
-                out = self.mel_spec(out)[..., :-1]
-            if self.with_path:
-                return out, file
-            else:
-                return out
+
+            return out
 
 
 class NoisyCleanSet:
-    def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None,
-                 pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False, mel_config=None):
+    def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None, pad=True, sample_rate=None, scale_factor=1):
         """__init__.
         :param json_dir: directory containing both clean.json and noisy.json
         :param matching: matching function for the files
@@ -106,16 +120,10 @@ class NoisyCleanSet:
         :param sample_rate: the signals sampling rate
         """
         self.scale_factor = scale_factor
-        self.with_path = with_path
         self.clean_length = clean_length
         self.calc_valid_length_func = calc_valid_length_func
-        self.is_training = is_training
 
-        if self.is_training:
-            input_training_length = math.ceil(self.clean_length / self.scale_factor)
-            self.valid_length = self.calc_valid_length_func(input_training_length)
-        else:
-            self.valid_length = None
+        self.valid_length = None
 
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
@@ -125,9 +133,9 @@ class NoisyCleanSet:
             clean = json.load(f)
 
         match_files(noisy, clean, matching)
-        kw = {'length': self.valid_length, 'stride': stride, 'pad': pad, 'with_path': with_path}
-        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw, mel_config=mel_config)
-        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw, mel_config=mel_config)
+        kw = {'length': self.valid_length, 'stride': stride, 'pad': pad}
+        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw)
+        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
         assert len(self.clean_set) == len(self.noisy_set)
 
@@ -143,21 +151,13 @@ class NoisyCleanSet:
 
         return noisy, clean
 
-    def _get_item_with_path(self, index):
-        (noisy, noisy_path), (clean, clean_path) = self.noisy_set[index], self.clean_set[index]
-        noisy, clean = self._process_data(noisy, clean)
-        return (noisy, noisy_path), (clean, clean_path)
-
     def _get_item_without_path(self, index):
         noisy, clean = self.noisy_set[index], self.clean_set[index]
         noisy, clean = self._process_data(noisy, clean)
         return noisy, clean
 
     def __getitem__(self, index):
-        if self.with_path:
-            return self._get_item_with_path(index)
-        else:
-            return self._get_item_without_path(index)
+        return self._get_item_without_path(index)
 
     def __len__(self):
         return len(self.noisy_set)
