@@ -200,7 +200,7 @@ class SincIntrpolationBaseline:
         self.sr = target_sample_rate
 
     def evaluate_single_batch(self, batch):
-        print(batch.shape)
+        print([x.shape for x in batch])
         nb, wb = batch
 
         metrics_out = dict()
