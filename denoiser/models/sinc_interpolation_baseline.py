@@ -26,8 +26,8 @@ def get_pesq(ref_sig, out_sig, sr):
     Returns:
         PESQ
     """
-    print(f"---\nref : {ref_sig}")
-    print(f"---\nest : {out_sig}")
+    print(f"---\nref : {None in ref_sig}")
+    print(f"---\nest : {None in out_sig}")
     pesq_val = pesq(sr, ref_sig.flatten(), out_sig.flatten(), 'wb')  # from pesq
     return pesq_val
 
