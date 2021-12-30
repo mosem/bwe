@@ -231,9 +231,10 @@ class SincIntrpolationBaseline:
 
         # loop over data-loader and collect metrics
         with ThreadPoolExecutor() as executor:
-            for tmp_metrics in executor.map(self.evaluate_single_batch, dataloader):
-                for key, val in tmp_metrics.items():
-                    metrics_out[key].append(val)
+            tmp_metrics = executor.map(self.evaluate_single_batch, dataloader)
+        for tmp_metric in tmp_metrics:
+            for key, val in tmp_metric.items():
+                metrics_out[key].append(val)
 
         # take mean of each metric
         return {key: np.mean(value) for key, value in metrics_out.items()}
