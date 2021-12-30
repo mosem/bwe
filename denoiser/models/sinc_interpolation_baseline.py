@@ -9,12 +9,42 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import torchaudio
 from torch.nn import functional as F
+from pesq import pesq
+from pystoi import stoi
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--path_to_json_dir")
 parser.add_argument("--src_sr", default=8000, required=False)
 parser.add_argument("--target_sr", default=16000, required=False)
 args = parser.parse_args()
+
+def get_pesq(ref_sig, out_sig, sr):
+    """Calculate PESQ.
+    Args:
+        ref_sig: numpy.ndarray, [B, T]
+        out_sig: numpy.ndarray, [B, T]
+    Returns:
+        PESQ
+    """
+    pesq_val = 0
+    for i in range(len(ref_sig)):
+        tmp = pesq(sr, ref_sig[i], out_sig[i], 'wb')  # from pesq
+        pesq_val += tmp
+    return pesq_val
+
+
+def get_stoi(ref_sig, out_sig, sr):
+    """Calculate STOI.
+    Args:
+        ref_sig: numpy.ndarray, [B, T]
+        out_sig: numpy.ndarray, [B, T]
+    Returns:
+        STOI
+    """
+    stoi_val = 0
+    for i in range(len(ref_sig)):
+        stoi_val += stoi(ref_sig[i], out_sig[i], sr, extended=False)
+    return stoi_val
 
 def match_files(noisy, clean, matching="sort"):
     """match_files.
