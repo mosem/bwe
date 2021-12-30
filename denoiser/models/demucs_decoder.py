@@ -2,7 +2,7 @@ import math
 
 from torch import nn
 
-from denoiser.models.dataclasses import DemucsDecoderConfig
+from denoiser.models.config_dataclasses import DemucsDecoderConfig
 from denoiser.models.demucs import rescale_module
 from denoiser.resample import downsample2
 from denoiser.utils import capture_init

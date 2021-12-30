@@ -12,7 +12,7 @@ import os
 import re
 
 from .audio import Audioset
-from .models.dataclasses import MelSpecConfig
+from .models.config_dataclasses import MelSpecConfig
 from .resample import downsample2
 from torch.nn import functional as F
 

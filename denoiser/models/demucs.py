@@ -9,7 +9,7 @@ import math
 
 from torch import nn
 
-from denoiser.models.dataclasses import FeaturesConfig, DemucsConfig
+from denoiser.models.config_dataclasses import FeaturesConfig, DemucsConfig
 from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init

@@ -17,7 +17,7 @@ from torch.nn import functional as F
 
 import logging
 
-from denoiser.models.dataclasses import MelSpecConfig
+from denoiser.models.config_dataclasses import MelSpecConfig
 
 logger = logging.getLogger(__name__)
 
