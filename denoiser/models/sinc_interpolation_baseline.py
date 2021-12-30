@@ -5,10 +5,10 @@ from torch.utils.data import DataLoader
 import argparse
 from torchaudio.transforms import Resample
 import numpy as np
-from denoiser.audio import Audioset
 from denoiser.evaluate import get_pesq, get_stoi
 from concurrent.futures import ThreadPoolExecutor
-
+import torchaudio
+from torch.nn import functional as F
 from denoiser.resample import downsample2
 
 parser = argparse.ArgumentParser()
@@ -26,6 +26,73 @@ def match_files(noisy, clean, matching="sort"):
     """
     noisy.sort()
     clean.sort()
+
+
+class Audioset:
+    def __init__(self, files=None, length=None, stride=None,
+                 pad=True, with_path=False, sample_rate=None, mel_config=None):
+        """
+        files should be a list [(file, length)]
+        """
+        self.files = files
+        self.num_examples = []
+        self.stride = stride or length
+        self.length = length
+        self.with_path = with_path
+        self.sample_rate = sample_rate
+        self.use_mel = mel_config.use_melspec if mel_config is not None else False
+        if self.use_mel:
+            self.mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate=mel_config.sample_rate,
+                                                                 n_fft=mel_config.n_fft,
+                                                                 n_mels=mel_config.n_mels,
+                                                                 hop_length=mel_config.hop_length)
+
+        for file, file_length in self.files:
+            if length is None:
+                examples = 1
+            elif file_length < length:
+                examples = 1 if pad else 0
+            elif pad:
+                examples = int(math.ceil((file_length - self.length) / self.stride))
+            else:
+                examples = (file_length - self.length) // self.stride
+            self.num_examples.append(examples)
+
+    def __len__(self):
+        return sum(self.num_examples)
+
+    def __getitem__(self, index):
+        for (file, _), examples in zip(self.files, self.num_examples):
+            if index >= examples:
+                index -= examples
+                continue
+            num_frames = 0
+            offset = 0
+            if self.length is not None:
+                offset = self.stride * index
+                num_frames = self.length
+
+            if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
+                out, sr = torchaudio.load(str(file),
+                                          frame_offset=offset,
+                                          num_frames=num_frames or -1)
+            else:
+                out, sr = torchaudio.load(str(file), offset=offset, num_frames=num_frames)
+            if self.sample_rate is not None:
+                if sr != self.sample_rate:
+                    raise RuntimeError(f"Expected {file} to have sample rate of "
+                                       f"{self.sample_rate}, but got {sr}")
+            if num_frames:
+                out = F.pad(out, (0, num_frames - out.shape[-1]))
+            if self.use_mel:
+                if len(out.shape) == 3:
+                    out = out.squeeze(1)
+                out = self.mel_spec(out)[..., :-1]
+            if self.with_path:
+                return out, file
+            else:
+                return out
+
 
 class NoisyCleanSet:
     def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None,
