@@ -27,6 +27,7 @@ def get_pesq(ref_sig, out_sig, sr):
         PESQ
     """
     pesq_val = 0
+    print(f"ref: {ref_sig.shape} | est: {out_sig.shape}")
     for i in range(len(ref_sig)):
         tmp = pesq(sr, ref_sig[i], out_sig[i], 'wb')  # from pesq
         pesq_val += tmp
