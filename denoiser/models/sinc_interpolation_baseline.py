@@ -203,8 +203,6 @@ class SincIntrpolationBaseline:
 
     def evaluate_single_batch(self, batch):
         nb, wb = batch
-        if nb is None or wb is None:
-            return dict()
 
         metrics_out = dict()
 
@@ -216,6 +214,9 @@ class SincIntrpolationBaseline:
             wb = wb[..., :upsampled_nb.shape[-1]]
         elif upsampled_nb.shape[-1] > wb.shape[-1]:
             upsampled_nb = wb[..., :wb.shape[-1]]
+
+        if upsampled_nb is None or wb is None:
+            return dict()
 
         # collect all metrics for batch
         for metric, f in self.metrics.items():
