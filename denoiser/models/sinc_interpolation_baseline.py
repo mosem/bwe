@@ -1,7 +1,7 @@
 import json
 import math
 import os
-import torch
+from torch import hann_window, sinc, linspace
 from torch.utils.data import DataLoader
 import argparse
 from torchaudio.transforms import Resample
@@ -32,11 +32,11 @@ def kernel_downsample2(zeros=56):
     """kernel_downsample2.
 
     """
-    win = torch.hann_window(4 * zeros + 1, periodic=False)
+    win = hann_window(4 * zeros + 1, periodic=False)
     winodd = win[1::2]
-    t = torch.linspace(-zeros + 0.5, zeros - 0.5, 2 * zeros)
+    t = linspace(-zeros + 0.5, zeros - 0.5, 2 * zeros)
     t.mul_(math.pi)
-    kernel = (torch.sinc(t) * winodd).view(1, 1, -1)
+    kernel = (sinc(t) * winodd).view(1, 1, -1)
     return kernel
 
 
