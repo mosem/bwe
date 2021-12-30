@@ -27,6 +27,8 @@ def get_pesq(ref_sig, out_sig, sr):
         PESQ
     """
     pesq_val = 0
+    if ref_sig is None or out_sig is None:
+        return 0
     for i in range(len(ref_sig)):
         tmp = pesq(sr, ref_sig[i], out_sig[i], 'wb')  # from pesq
         pesq_val += tmp
