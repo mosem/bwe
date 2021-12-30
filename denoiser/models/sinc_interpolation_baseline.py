@@ -26,12 +26,7 @@ def get_pesq(ref_sig, out_sig, sr):
     Returns:
         PESQ
     """
-    pesq_val = 0
-    if ref_sig is None or out_sig is None:
-        return 0
-    for i in range(len(ref_sig)):
-        tmp = pesq(sr, ref_sig[i], out_sig[i], 'wb')  # from pesq
-        pesq_val += tmp
+    pesq_val = pesq(sr, ref_sig.flatten(), out_sig.flatten(), 'wb')  # from pesq
     return pesq_val
 
 
@@ -43,9 +38,7 @@ def get_stoi(ref_sig, out_sig, sr):
     Returns:
         STOI
     """
-    stoi_val = 0
-    for i in range(len(ref_sig)):
-        stoi_val += stoi(ref_sig[i], out_sig[i], sr, extended=False)
+    stoi_val = stoi(ref_sig.flatten(), out_sig.flatten(), sr, extended=False)
     return stoi_val
 
 def match_files(noisy, clean, matching="sort"):
