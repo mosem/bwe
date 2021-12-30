@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader
 import argparse
 from torchaudio.transforms import Resample
 import numpy as np
-from denoiser.evaluate import get_pesq, get_stoi
 from concurrent.futures import ThreadPoolExecutor
 import torchaudio
 from torch.nn import functional as F
