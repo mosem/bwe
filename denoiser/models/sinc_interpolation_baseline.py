@@ -1,11 +1,10 @@
 import json
 import math
 import os
-
-import torch
+from torch.utils.data import DataLoader
 import argparse
 from torchaudio.transforms import Resample
-
+import numpy as np
 from denoiser.audio import Audioset
 from denoiser.evaluate import get_pesq, get_stoi
 from concurrent.futures import ThreadPoolExecutor
@@ -30,7 +29,7 @@ def match_files(noisy, clean, matching="sort"):
 
 class NoisyCleanSet:
     def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None,
-                 pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False, mel_config:MelSpecConfig=None):
+                 pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False, mel_config=None):
         """__init__.
         :param json_dir: directory containing both clean.json and noisy.json
         :param matching: matching function for the files
@@ -124,7 +123,7 @@ class SincIntrpolationBaseline:
 
         return metrics_out
 
-    def evaluate(self, dataloader: torch.utils.data.DataLoader):
+    def evaluate(self, dataloader: DataLoader):
         """
         :param metrics: dictionary{metric_name: metric_function} where metric_function has args: (ref_sig, out_sig, sr)
 
@@ -141,13 +140,13 @@ class SincIntrpolationBaseline:
                     metrics_out[key].append(val)
 
         # take mean of each metric
-        return {key: torch.mean(value) for key, value in metrics_out.items()}
+        return {key: np.mean(value.numpy()) for key, value in metrics_out.items()}
 
 
 def run_pesq_stoi_eval_from_json(path_to_json_dir, src_sr=8000, target_sr=16000):
     metrics = {'pesq': get_pesq, 'stoi': get_stoi}
     baseline = SincIntrpolationBaseline(src_sr, target_sr)
-    data_loader = torch.utils.data.DataLoader(NoisyCleanSet(path_to_json_dir, None, scale_factor=target_sr//src_sr),
+    data_loader = DataLoader(NoisyCleanSet(path_to_json_dir, None, scale_factor=target_sr//src_sr),
                                               batch_size=1)
     return baseline.evaluate(data_loader, metrics)
 
