@@ -234,8 +234,9 @@ class SincIntrpolationBaseline:
         metrics_out = {key: list() for key in self.metrics.keys()}
 
         # loop over data-loader and collect metrics
-        with ThreadPoolExecutor() as executor:
-            tmp_metrics = executor.map(self.evaluate_single_batch, dataloader)
+        # with ThreadPoolExecutor() as executor:
+        #     tmp_metrics = executor.map(self.evaluate_single_batch, dataloader)
+        tmp_metrics = map(self.evaluate_single_batch, dataloader)
         for tmp_metric in tmp_metrics:
             for key, val in tmp_metric.items():
                 metrics_out[key].append(val)
