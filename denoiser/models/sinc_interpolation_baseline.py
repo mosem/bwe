@@ -183,7 +183,7 @@ class NoisyCleanSet:
     def _get_item_without_path(self, index):
         noisy, clean = self.noisy_set[index], self.clean_set[index]
         noisy, clean = self._process_data(noisy, clean)
-        return noisy, clean
+        return noisy.squeeze(1), clean.squeeze(1)
 
     def __getitem__(self, index):
         return self._get_item_without_path(index)
@@ -200,7 +200,6 @@ class SincIntrpolationBaseline:
         self.sr = target_sample_rate
 
     def evaluate_single_batch(self, batch):
-        print([x.shape for x in batch])
         nb, wb = batch
 
         metrics_out = dict()
