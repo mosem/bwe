@@ -236,7 +236,7 @@ class SincIntrpolationBaseline:
                     metrics_out[key].append(val)
 
         # take mean of each metric
-        return {key: np.mean(value.numpy()) for key, value in metrics_out.items()}
+        return {key: np.mean(value) for key, value in metrics_out.items()}
 
 
 def run_pesq_stoi_eval_from_json(path_to_json_dir, src_sr=8000, target_sr=16000):
