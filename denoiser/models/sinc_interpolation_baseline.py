@@ -241,10 +241,10 @@ class SincIntrpolationBaseline:
 
 def run_pesq_stoi_eval_from_json(path_to_json_dir, src_sr=8000, target_sr=16000):
     metrics = {'pesq': get_pesq, 'stoi': get_stoi}
-    baseline = SincIntrpolationBaseline(src_sr, target_sr)
+    baseline = SincIntrpolationBaseline(metrics, src_sr, target_sr)
     data_loader = DataLoader(NoisyCleanSet(path_to_json_dir, None, scale_factor=target_sr//src_sr),
                                               batch_size=1)
-    return baseline.evaluate(data_loader, metrics)
+    return baseline.evaluate(data_loader)
 
 
 if __name__ == "__main__":
