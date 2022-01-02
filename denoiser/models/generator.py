@@ -47,15 +47,33 @@ class SpCombModule(nn.Module):
         return full_band_signal
 
 
-class LowPassModule(nn.Module):
+class ConditionalBias(nn.Module):
 
-    def __init__(self):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
+        self.linear = nn.Linear(in_channels, out_channels)
 
     def forward(self, signal):
-        # bias = torch.zeros_like(signal, requires_grad=True)
-        bias = torch.ones_like(signal, requires_grad=True)
-        return signal + bias*torch.pow(signal,2)
+        """
+
+        :param signal: [B,C,T]
+        :return:
+        """
+        bias = signal.permute(0,2,1)
+        bias = self.linear(bias)
+        bias = bias.permute(0,2,1)
+        return bias
+
+
+class LowPassModule(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conditional_bias = ConditionalBias(in_channels, out_channels)
+
+    def forward(self, signal):
+        bias = self.conditional_bias(signal)
+        return signal + bias
 
 
 class HighPassModule(nn.Module):
@@ -96,7 +114,7 @@ class Generator(nn.Module):
         self.depth = depth
         self.scale_factor = scale_factor
 
-        self.low_pass_module = LowPassModule()
+        self.low_pass_module = LowPassModule(1,1)
 
         self.high_pass_module = HighPassModule(depth, n_residual_layers, n_features)
 
