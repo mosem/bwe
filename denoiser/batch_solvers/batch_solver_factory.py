@@ -9,7 +9,7 @@ class BatchSolverFactory:
     @staticmethod
     def get_bs(args):
         if args.experiment.model == "dummy":
-            generator = Generator()
+            generator = Generator(**args.experiment.generator)
         else:
             raise ValueError("Given model name is not supported")
 
