@@ -22,6 +22,8 @@ from . import distrib
 from .resample import upsample2
 from .utils import bold, LogProgress, convert_spectrogram_to_heatmap
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,6 +31,7 @@ def evaluate(args, model, data_loader, epoch):
     total_pesq = 0
     total_stoi = 0
     total_lsd = 0
+    total_sisnr = 0
     total_cnt = 0
     updates = 5
     model.eval()
@@ -61,17 +64,18 @@ def evaluate(args, model, data_loader, epoch):
                 total_cnt += clean.shape[0]
 
         for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
-            pesq_i, stoi_i, snr_i, lsd_i, estimate_i, filename_i = pending.result()
+            pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, estimate_i, filename_i = pending.result()
             if filename_i in files_to_log:
-                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, lsd_i, filename_i, epoch, args.experiment.sample_rate)
+                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, filename_i, epoch, args.experiment.sample_rate)
             total_pesq += pesq_i
             total_stoi += stoi_i
             total_lsd += lsd_i
+            total_sisnr + sisnr_i
 
-    metrics = [total_pesq, total_stoi, total_lsd]
-    avg_pesq, avg_stoi, avg_lsd = distrib.average([m/total_cnt for m in metrics], total_cnt)
+    metrics = [total_pesq, total_stoi, total_lsd, total_sisnr]
+    avg_pesq, avg_stoi, avg_lsd, avg_sisnr = distrib.average([m/total_cnt for m in metrics], total_cnt)
     logger.info(bold(f'Test set performance:PESQ={avg_pesq}, STOI={avg_stoi}, LSD={avg_lsd}.'))
-    return avg_pesq, avg_stoi, avg_lsd
+    return avg_pesq, avg_stoi, avg_lsd, avg_sisnr
 
 
 def log_to_wandb(signal, pesq, stoi, snr, lsd, filename, epoch, sr):
@@ -96,8 +100,8 @@ def estimate_and_run_metrics(clean, model, noisy, args, filename, include_ft=Fal
 
 def run_metrics(clean, estimate, noisy_len, args, filename):
     clean, estimate = pad_signals_to_noisy_length(clean, noisy_len, estimate)
-    pesq, stoi, snr, lsd = get_metrics(clean, estimate, args.experiment.sample_rate)
-    return pesq, stoi, snr, lsd, estimate, filename
+    pesq, stoi, snr, lsd, sisnr = get_metrics(clean, estimate, args.experiment.sample_rate)
+    return pesq, stoi, snr, lsd, sisnr, estimate, filename
 
 
 def get_metrics(clean, estimate, sr):
@@ -109,7 +113,8 @@ def get_metrics(clean, estimate, sr):
     stoi = get_stoi(clean_numpy, estimate_numpy, sr=sr)
     snr = get_snr(estimate, clean).item()
     lsd = get_lsd(estimate, clean).item()
-    return pesq, stoi, snr, lsd
+    sisnr = get_sisnr(estimate, clean)
+    return pesq, stoi, snr, lsd, sisnr
 
 
 def get_pesq(ref_sig, out_sig, sr):
@@ -187,6 +192,27 @@ def get_lsd(x, y):
     value = torch.sum(sum_freq, dim=-1) / sum_freq.size(-1)
 
     return value
+
+
+def get_sisnr(ref_sig, out_sig, eps=1e-8):
+    """Calcuate Scale-Invariant Source-to-Noise Ratio (SI-SNR)
+    Args:
+        ref_sig: numpy.ndarray, [B, T]
+        out_sig: numpy.ndarray, [B, T]
+    Returns:
+        SISNR
+    """
+    assert len(ref_sig) == len(out_sig)
+    B, T = ref_sig.shape
+    ref_sig = ref_sig - np.mean(ref_sig, axis=1).reshape(B, 1)
+    out_sig = out_sig - np.mean(out_sig, axis=1).reshape(B, 1)
+    ref_energy = (np.sum(ref_sig ** 2, axis=1) + eps).reshape(B, 1)
+    proj = (np.sum(ref_sig * out_sig, axis=1).reshape(B, 1)) * \
+           ref_sig / ref_energy
+    noise = out_sig - proj
+    ratio = np.sum(proj ** 2, axis=1) / (np.sum(noise ** 2, axis=1) + eps)
+    sisnr = 10 * np.log(ratio + eps) / np.log(10.0)
+    return sisnr.mean()
 
 
 def upsample_noisy(args, noisy):

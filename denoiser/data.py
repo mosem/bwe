@@ -15,6 +15,7 @@ from .audio import Audioset
 from .models.dataclasses import MelSpecConfig
 from .resample import downsample2
 from torch.nn import functional as F
+from torchaudio.transforms import Resample
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,8 @@ class NoisyCleanSet:
         self.calc_valid_length_func = calc_valid_length_func
         self.is_training = is_training
 
+        self.resample = Resample(sample_rate, sample_rate / scale_factor)
+
         if self.is_training:
             input_training_length = math.ceil(self.clean_length / self.scale_factor)
             self.valid_length = self.calc_valid_length_func(input_training_length)
@@ -120,13 +123,15 @@ class NoisyCleanSet:
             noisy = pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
             clean = pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
 
-        if self.scale_factor == 2:
-            noisy = downsample2(noisy)
-        elif self.scale_factor == 4:
-            noisy = downsample2(noisy)
-            noisy = downsample2(noisy)
-        elif self.scale_factor != 1:
-            raise RuntimeError(f"Scale factor should be 1, 2, or 4")
+        # if self.scale_factor == 2:
+        #     noisy = downsample2(noisy)
+        # elif self.scale_factor == 4:
+        #     noisy = downsample2(noisy)
+        #     noisy = downsample2(noisy)
+        # elif self.scale_factor != 1:
+        #     raise RuntimeError(f"Scale factor should be 1, 2, or 4")
+
+        noisy = self.resample(noisy)
 
         return noisy, clean
 
