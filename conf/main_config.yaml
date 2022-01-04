@@ -46,7 +46,7 @@ streaming: False  # use streaming evaluation for Demucs
 
 #wand_b
 wandb:
-  mode: disabled  # online/offline/disabled
+  mode: online  # online/offline/disabled
   log: all # gradients/parameters/all/None
   log_freq: 5
   n_files_to_log: 10 # number or -1 for all files
@@ -74,7 +74,7 @@ world_size:
 # Hydra config
 hydra:
   run:
-    dir: ./outputs/${experiment.experiment_name}/${hydra.job.id}
+    dir: ./outputs/${experiment.experiment_name}
   job:
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable

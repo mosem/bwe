@@ -18,3 +18,4 @@ launch_valentini.sh
 /wandb_keys.json
 /test_data/
 .idea/
+/audio-super-res/

@@ -11,4 +11,6 @@ python train.py \
   experiment.experiment_name=testing_sisnr \
   experiment=initial \
   experiment.scale_factor=2 \
+  epochs=1 \
+
 

@@ -60,6 +60,7 @@ def create_results_df(args):
 
         noisy_snr = get_snr(noisy, clean).item()
         pesq, stoi, enhanced_snr, lsd, sisnr = get_metrics(clean, enhanced, args.experiment.sample_rate)
+        logger.info(f'i: {i}, pesq: {pesq}, stoi: {stoi}, sisnr: {sisnr}')
 
         filename = os.path.basename(clean_path).rstrip('_clean.wav')
         df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi, lsd, sisnr]

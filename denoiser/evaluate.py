@@ -70,7 +70,7 @@ def evaluate(args, model, data_loader, epoch):
             total_pesq += pesq_i
             total_stoi += stoi_i
             total_lsd += lsd_i
-            total_sisnr + sisnr_i
+            total_sisnr += sisnr_i
 
     metrics = [total_pesq, total_stoi, total_lsd, total_sisnr]
     avg_pesq, avg_stoi, avg_lsd, avg_sisnr = distrib.average([m/total_cnt for m in metrics], total_cnt)
@@ -78,7 +78,7 @@ def evaluate(args, model, data_loader, epoch):
     return avg_pesq, avg_stoi, avg_lsd, avg_sisnr
 
 
-def log_to_wandb(signal, pesq, stoi, snr, lsd, filename, epoch, sr):
+def log_to_wandb(signal, pesq, stoi, snr, lsd, sisnr, filename, epoch, sr):
     spectrogram_transform = Spectrogram()
     enhanced_spectrogram = spectrogram_transform(signal).log2()[0, :, :].numpy()
     enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram), caption=filename)
@@ -87,6 +87,7 @@ def log_to_wandb(signal, pesq, stoi, snr, lsd, filename, epoch, sr):
                f'test samples/{filename}/stoi': stoi,
                f'test samples/{filename}/snr': snr,
                f'test samples/{filename}/lsd': lsd,
+               f'test samples/{filename}/sisnr': sisnr,
                f'test samples/{filename}/spectrogram': enhanced_spectrogram_wandb_image,
                f'test samples/{filename}/audio': enhanced_wandb_audio},
               step=epoch)
@@ -113,7 +114,7 @@ def get_metrics(clean, estimate, sr):
     stoi = get_stoi(clean_numpy, estimate_numpy, sr=sr)
     snr = get_snr(estimate, clean).item()
     lsd = get_lsd(estimate, clean).item()
-    sisnr = get_sisnr(estimate, clean)
+    sisnr = get_sisnr(clean_numpy, estimate_numpy)
     return pesq, stoi, snr, lsd, sisnr
 
 
