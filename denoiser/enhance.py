@@ -20,10 +20,10 @@ from .utils import LogProgress
 logger = logging.getLogger(__name__)
 
 
-def get_estimate(model, noisy_sigs, include_features=False):
+def get_estimate(model, noisy_sigs):
     torch.set_num_threads(1)
     with torch.no_grad():
-        estimate = model(noisy_sigs)[0] if include_features else model(noisy_sigs)
+        estimate = model(noisy_sigs)
     return estimate
 
 
@@ -48,12 +48,11 @@ def save_wavs(noisy_sigs, clean_sigs, enhanced_sigs, raw_lengths_pairs, filename
 def write(wav, filename, sr=16_000):
     # Normalize audio if it prevents clipping
     wav = wav / max(wav.abs().max().item(), 1)
-    torchaudio.save(filename, wav.cpu(), sr)
+    torchaudio.save(filename, wav.cpu(), sr, bits_per_sample=16)
 
 
-def estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, source_sr=16_000, target_sr=16_000,
-                      include_ft=False):
-    estimate_sigs = get_estimate(model, noisy_sigs, include_ft)
+def estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, source_sr=16_000, target_sr=16_000):
+    estimate_sigs = get_estimate(model, noisy_sigs)
     save_wavs(noisy_sigs, clean_sigs, estimate_sigs, raw_lengths_pairs, filenames, source_sr=source_sr, target_sr=target_sr)
 
 
@@ -81,7 +80,6 @@ def enhance(args, model, out_dir, data_loader):
     if distrib.rank == 0:
         os.makedirs(out_dir, exist_ok=True)
     distrib.barrier()
-    include_ft = args.experiment.features_model.include_ft if hasattr(args.experiment, "features_model") else False
     noisy_json_dict, clean_json_dict = get_raw_lengths_dicts(args)
 
     with ProcessPoolExecutor(args.num_workers) as pool:
@@ -103,11 +101,10 @@ def enhance(args, model, out_dir, data_loader):
                                 noisy_sigs, clean_sigs,
                                 raw_lengths_pairs,
                                 basenames, noisy_sr,
-                                args.experiment.sample_rate,
-                                include_ft))
+                                args.experiment.sample_rate))
             else:
                 # Forward
-                estimate = get_estimate(model, noisy_sigs, include_ft)
+                estimate = get_estimate(model, noisy_sigs)
 
                 save_wavs(noisy_sigs, clean_sigs, estimate, raw_lengths_pairs, basenames,
                           source_sr=noisy_sr, target_sr=args.experiment.sample_rate)

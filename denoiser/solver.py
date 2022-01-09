@@ -33,10 +33,11 @@ SERIALIZE_KEY_ARGS = 'args'
 
 METRICS_KEY_EVALUATION_LOSS = 'evaluation_loss'
 METRICS_KEY_BEST_LOSS = 'best_loss'
-METRICS_KEY_PESQ = 'total pesq'
-METRICS_KEY_STOI = 'total stoi'
-METRICS_KEY_LSD = 'total lsd'
-METRICS_KEY_SISNR = 'total sisnr'
+METRICS_KEY_PESQ = 'Average pesq'
+METRICS_KEY_STOI = 'Average stoi'
+METRICS_KEY_LSD = 'Average lsd'
+METRICS_KEY_SISNR = 'Average sisnr'
+METRICS_KEY_VISQOL = 'Average visqol'
 
 
 class Solver(object):
@@ -177,10 +178,10 @@ class Solver(object):
 
                 generator = self.batch_solver.get_generator_for_evaluation(self.best_states)
                 with torch.no_grad():
-                    pesq, stoi, lsd, sisnr = evaluate(self.args, generator, self.tt_loader, epoch)
+                    pesq, stoi, lsd, sisnr, visqol = evaluate(self.args, generator, self.tt_loader, epoch)
 
                     metrics.update({METRICS_KEY_PESQ: pesq, METRICS_KEY_STOI: stoi, METRICS_KEY_LSD: lsd,
-                                    METRICS_KEY_SISNR: sisnr})
+                                    METRICS_KEY_SISNR: sisnr, METRICS_KEY_VISQOL: visqol})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')

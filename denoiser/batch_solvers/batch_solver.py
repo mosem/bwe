@@ -3,8 +3,7 @@ from abc import ABC, abstractmethod
 import torch
 import torchaudio
 import torch.nn.functional as F
-from denoiser.utils import serialize_model, copy_state, load_lexical_model
-from denoiser.models.dataclasses import FeaturesConfig
+from denoiser.utils import serialize_model, copy_state
 
 
 class BatchSolver(ABC):

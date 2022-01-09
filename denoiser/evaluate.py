@@ -4,7 +4,10 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # author: adiyoss
+from datetime import datetime
+import shutil
 import os
+import subprocess
 from concurrent.futures import ProcessPoolExecutor
 import logging
 
@@ -17,7 +20,7 @@ from pystoi import stoi
 import torch
 from .stft_loss import stft
 
-from .enhance import get_estimate
+from .enhance import get_estimate, write
 from . import distrib
 from .resample import upsample2
 from .utils import bold, LogProgress, convert_spectrogram_to_heatmap
@@ -32,10 +35,10 @@ def evaluate(args, model, data_loader, epoch):
     total_stoi = 0
     total_lsd = 0
     total_sisnr = 0
+    total_visqol = 0
     total_cnt = 0
     updates = 5
     model.eval()
-    include_ft = args.experiment.features_model.include_ft if hasattr(args.experiment, "features_model") else False
     files_to_log = []
 
     pendings = []
@@ -53,9 +56,9 @@ def evaluate(args, model, data_loader, epoch):
                 # If device is CPU, we do parallel evaluation in each CPU worker.
                 if args.device == 'cpu':
                     pendings.append(
-                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args, filename, include_ft))
+                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args, filename))
                 else:
-                    estimate = get_estimate(model, noisy)[0] if include_ft else get_estimate(model, noisy)
+                    estimate = get_estimate(model, noisy)
                     noisy = upsample_noisy(args, noisy)
                     estimate = estimate.cpu()
                     clean = clean.cpu()
@@ -64,21 +67,23 @@ def evaluate(args, model, data_loader, epoch):
                 total_cnt += clean.shape[0]
 
         for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
-            pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, estimate_i, filename_i = pending.result()
+            pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, visqol_i, estimate_i, filename_i = pending.result()
             if filename_i in files_to_log:
-                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, filename_i, epoch, args.experiment.sample_rate)
+                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, visqol_i,
+                             filename_i, epoch, args.experiment.sample_rate)
             total_pesq += pesq_i
             total_stoi += stoi_i
             total_lsd += lsd_i
             total_sisnr += sisnr_i
+            total_visqol += visqol_i
 
-    metrics = [total_pesq, total_stoi, total_lsd, total_sisnr]
-    avg_pesq, avg_stoi, avg_lsd, avg_sisnr = distrib.average([m/total_cnt for m in metrics], total_cnt)
-    logger.info(bold(f'Test set performance:PESQ={avg_pesq}, STOI={avg_stoi}, LSD={avg_lsd}.'))
-    return avg_pesq, avg_stoi, avg_lsd, avg_sisnr
+    metrics = [total_pesq, total_stoi, total_lsd, total_sisnr, total_visqol]
+    avg_pesq, avg_stoi, avg_lsd, avg_sisnr, avg_visqol = distrib.average([m/total_cnt for m in metrics], total_cnt)
+    logger.info(bold(f'Test set performance:PESQ={avg_pesq}, STOI={avg_stoi}, LSD={avg_lsd}, SISNR={avg_sisnr} ,VISQOL={avg_visqol}.'))
+    return avg_pesq, avg_stoi, avg_lsd, avg_sisnr, avg_visqol
 
 
-def log_to_wandb(signal, pesq, stoi, snr, lsd, sisnr, filename, epoch, sr):
+def log_to_wandb(signal, pesq, stoi, snr, lsd, sisnr, visqol, filename, epoch, sr):
     spectrogram_transform = Spectrogram()
     enhanced_spectrogram = spectrogram_transform(signal).log2()[0, :, :].numpy()
     enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram), caption=filename)
@@ -88,24 +93,25 @@ def log_to_wandb(signal, pesq, stoi, snr, lsd, sisnr, filename, epoch, sr):
                f'test samples/{filename}/snr': snr,
                f'test samples/{filename}/lsd': lsd,
                f'test samples/{filename}/sisnr': sisnr,
+               f'test samples/{filename}/visqol': visqol,
                f'test samples/{filename}/spectrogram': enhanced_spectrogram_wandb_image,
                f'test samples/{filename}/audio': enhanced_wandb_audio},
               step=epoch)
 
 
-def estimate_and_run_metrics(clean, model, noisy, args, filename, include_ft=False):
+def estimate_and_run_metrics(clean, model, noisy, args, filename):
     estimate = get_estimate(model, noisy)
     noisy = upsample_noisy(args, noisy)
-    return run_metrics(clean, estimate[0] if include_ft else estimate, noisy.shape[-1], args, filename)
+    return run_metrics(clean, estimate, noisy.shape[-1], args, filename)
 
 
 def run_metrics(clean, estimate, noisy_len, args, filename):
     clean, estimate = pad_signals_to_noisy_length(clean, noisy_len, estimate)
-    pesq, stoi, snr, lsd, sisnr = get_metrics(clean, estimate, args.experiment.sample_rate)
-    return pesq, stoi, snr, lsd, sisnr, estimate, filename
+    pesq, stoi, snr, lsd, sisnr, visqol = get_metrics(clean, estimate, args.experiment.sample_rate, filename)
+    return pesq, stoi, snr, lsd, sisnr, visqol, estimate, filename
 
 
-def get_metrics(clean, estimate, sr):
+def get_metrics(clean, estimate, sr, filename):
     clean = clean.squeeze(dim=1)
     estimate = estimate.squeeze(dim=1)
     estimate_numpy = estimate.numpy()
@@ -115,7 +121,8 @@ def get_metrics(clean, estimate, sr):
     snr = get_snr(estimate, clean).item()
     lsd = get_lsd(estimate, clean).item()
     sisnr = get_sisnr(clean_numpy, estimate_numpy)
-    return pesq, stoi, snr, lsd, sisnr
+    visqol = get_visqol(clean, estimate, filename)
+    return pesq, stoi, snr, lsd, sisnr, visqol
 
 
 def get_pesq(ref_sig, out_sig, sr):
@@ -143,7 +150,7 @@ def get_stoi(ref_sig, out_sig, sr):
     """
     stoi_val = 0
     for i in range(len(ref_sig)):
-        stoi_val += stoi(ref_sig[i], out_sig[i], sr, extended=False)
+        stoi_val += stoi(ref_sig[i], out_sig[i], sr, extended=True)
     return stoi_val
 
 
@@ -214,6 +221,44 @@ def get_sisnr(ref_sig, out_sig, eps=1e-8):
     ratio = np.sum(proj ** 2, axis=1) / (np.sum(noise ** 2, axis=1) + eps)
     sisnr = 10 * np.log(ratio + eps) / np.log(10.0)
     return sisnr.mean()
+
+
+# from: https://github.com/eagomez2/upf-smc-speech-enhancement-thesis/blob/main/src/utils/evaluation_process.py
+def get_visqol(ref_sig, out_sig, filename):
+    tmp_reference = f"{filename}_ref.wav"
+    tmp_estimation = f"{filename}_est.wav"
+
+    reference_abs_path = os.path.abspath(tmp_reference)
+    estimation_abs_path = os.path.abspath(tmp_estimation)
+
+    try:
+        write(ref_sig, reference_abs_path)
+        write(out_sig, estimation_abs_path)
+
+        visqol_cmd = ("cd /cs/labs/adiyoss/moshemandel/visqol-master; "
+                      "./bazel-bin/visqol "
+                      f"--reference_file {reference_abs_path} "
+                      f"--degraded_file {estimation_abs_path} "
+                      f"--use_speech_mode")
+
+        visqol = subprocess.run(visqol_cmd, shell=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        # parse stdout to get the current float value
+        visqol = visqol.stdout.decode("utf-8").split("\t")[-1].replace("\n", "")
+        visqol = float(visqol)
+
+    except Exception as e:
+        logger.info(f'failed to get visqol of {filename}')
+        logger.info(str(e))
+        visqol = 0
+
+    else:
+        # remove files to avoid filling space storage
+        os.remove(reference_abs_path)
+        os.remove(estimation_abs_path)
+
+    return visqol
 
 
 def upsample_noisy(args, noisy):

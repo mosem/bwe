@@ -1,5 +1,5 @@
 # @package experiment
-experiment_name: seanet
+experiment_name: sinc
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
@@ -12,22 +12,7 @@ batch_size: 16
 scale_factor: 2
 
 # models related
-model: seanet
-seanet:
-  latent_space_size: 128
-  ngf: 32
-  n_residual_layers: 3
-  resample: 1
-  normalize: True
-  floor: 1e-3
-  ratios: [ 8,8,2,2 ]
+model: sinc
+sinc:
+  sample_rate: ${experiment.sample_rate}
   scale_factor: ${experiment.scale_factor}
-
-adversarial: True
-discriminator_model: standard # standard/laplacian
-features_loss_lambda: 100
-discriminator:
-  n_layers: 4
-  num_D: 3
-  downsampling_factor: 4
-  ndf: 16

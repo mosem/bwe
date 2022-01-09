@@ -3,6 +3,7 @@ from denoiser.batch_solvers.adversarial_bs import AdversarialBS
 from denoiser.models.generator import Generator
 from denoiser.models.modules import Discriminator
 from denoiser.models.seanet import Seanet
+from denoiser.models.sinc import Sinc
 
 
 class BatchSolverFactory:

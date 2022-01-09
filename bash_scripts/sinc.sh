@@ -7,10 +7,8 @@
 # authors: adiyoss and adefossez
 
 python train.py \
-  dset=valentini_dummy \
-  experiment.experiment_name=testing_visqol \
-  experiment=initial \
-  experiment.scale_factor=2 \
+  dset=valentini \
+  experiment=sinc \
   epochs=1 \
 
 
