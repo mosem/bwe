@@ -40,9 +40,9 @@ def save_wavs(noisy_sigs, clean_sigs, enhanced_sigs, raw_lengths_pairs, filename
     for noisy, clean, enhanced, raw_lengths_pair, filename in zip(noisy_sigs, clean_sigs, enhanced_sigs,
                                                                   raw_lengths_pairs, filenames):
         noisy, clean, enhanced = trim(noisy, clean, enhanced, raw_lengths_pair)
-        write(noisy, filename + "_noisy.wav", sr=source_sr)
-        write(clean, filename + "_clean.wav", sr=target_sr)
-        write(enhanced, filename + "_enhanced.wav", sr=target_sr)
+        write(noisy, filename + "_lr.wav", sr=source_sr)
+        write(clean, filename + "_hr.wav", sr=target_sr)
+        write(enhanced, filename + "_pr.wav", sr=target_sr)
 
 
 def write(wav, filename, sr=16_000):

@@ -48,7 +48,7 @@ def evaluate(args, model, data_loader, epoch):
             for i, data in enumerate(iterator):
                 # Get batch data
                 (noisy, noisy_path), (clean, clean_path) = data
-                filename = os.path.basename(clean_path[0]).rstrip('_clean.wav')
+                filename = os.path.basename(clean_path[0]).rstrip('_hr.wav')
                 noisy = noisy.to(args.device)
                 clean = clean.to(args.device)
                 if args.wandb.n_files_to_log == -1 or len(files_to_log) < args.wandb.n_files_to_log:

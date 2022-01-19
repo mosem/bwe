@@ -44,9 +44,9 @@ def create_results_df(args):
     df = pd.DataFrame(columns=[RESULTS_DF_FILENAME, RESULTS_DF_NOISY_SNR, RESULTS_DF_ENHANCED_SNR, RESULTS_DF_PESQ,
                                RESULTS_DF_STOI, RESULTS_DF_LSD, RESULTS_DF_SISNR, RESULTS_DF_VISQOL])
     files = find_audio_files(args.samples_dir, progress=False)
-    clean_paths = [str(data[0]) for data in files if '_clean' in str(data[0])]
-    noisy_paths = [str(data[0]) for data in files if '_noisy' in str(data[0])]
-    enhanced_paths = [str(data[0]) for data in files if '_enhanced' in str(data[0])]
+    clean_paths = [str(data[0]) for data in files if '_hr' in str(data[0])]
+    noisy_paths = [str(data[0]) for data in files if '_lr' in str(data[0])]
+    enhanced_paths = [str(data[0]) for data in files if '_pr' in str(data[0])]
     for i, (clean_path, noisy_path, enhanced_path) in enumerate(zip(clean_paths, noisy_paths, enhanced_paths)):
         clean, clean_sr = torchaudio.load(clean_path)
         noisy, noisy_sr = torchaudio.load(noisy_path)
@@ -62,7 +62,7 @@ def create_results_df(args):
 
         noisy_snr = get_snr(noisy, clean).item()
 
-        filename = os.path.basename(clean_path).rstrip('_clean.wav')
+        filename = os.path.basename(clean_path).rstrip('_hr.wav')
         pesq, stoi, enhanced_snr, lsd, sisnr, visqol = get_metrics(clean, enhanced, args.experiment.sample_rate, filename)
 
 
@@ -187,9 +187,9 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
 
     clean_sr = args.experiment.sample_rate
 
-    clean_wandb_audio = wandb.Audio(clean.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_clean')
-    noisy_wandb_audio = wandb.Audio(noisy.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_noisy')
-    enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_enhanced')
+    clean_wandb_audio = wandb.Audio(clean.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_hr')
+    noisy_wandb_audio = wandb.Audio(noisy.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_lr')
+    enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_pr')
 
     wandb_table.add_data(filename, clean_wandb_audio, clean_wandb_spec, noisy_wandb_audio, noisy_wandb_spec,
                          enhanced_wandb_audio, enhaced_wandb_spec,
