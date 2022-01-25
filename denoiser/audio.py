@@ -34,13 +34,12 @@ def get_info(path):
         return Info(siginfo.length // siginfo.channels, siginfo.rate, siginfo.channels)
 
 
-def find_audio_files(path, exts=[".wav"], progress=True):
+def find_audio_files(path, filenames, exts=[".wav"], progress=True):
     audio_files = []
-    for root, folders, files in os.walk(path, followlinks=True):
-        for file in files:
-            file = Path(root) / file
-            if file.suffix.lower() in exts:
-                audio_files.append(str(file.resolve()))
+    for file in filenames:
+        file = Path(path) / file
+        if file.suffix.lower() in exts:
+            audio_files.append(str(file.resolve()))
     meta = []
     for idx, file in enumerate(audio_files):
         info = get_info(file)
@@ -119,6 +118,10 @@ class Audioset:
 
 if __name__ == "__main__":
     meta = []
-    for path in sys.argv[1:]:
-        meta += find_audio_files(path)
+    src_dir = sys.argv[1]
+    filenames_file = open(sys.argv[2], 'r')
+    filenames = filenames_file.read().splitlines()
+
+    meta += find_audio_files(src_dir, filenames)
     json.dump(meta, sys.stdout, indent=4)
+    filenames_file.close()

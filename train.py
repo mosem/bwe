@@ -12,11 +12,7 @@ import wandb
 
 from denoiser.executor import start_ddp_workers
 from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
-from denoiser.enhance import enhance
-from denoiser.models.sinc import Sinc
-from denoiser.log_results import log_results
-from denoiser.evaluate import evaluate
-from denoiser.utils import bold
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,29 +27,6 @@ def run(args):
     from denoiser.solver import Solver
     distrib.init(args)
 
-    if args.experiment.model == "sinc":
-        generator = Sinc(**args.experiment.sinc)
-        if torch.cuda.is_available() and args.device == 'cuda':
-            generator.cuda()
-        tt_dataset = NoisyCleanSet(args.dset.test, generator.estimate_output_length,
-                                   scale_factor=args.experiment.scale_factor, with_path=True,
-                                   matching=args.dset.matching, sample_rate=args.experiment.sample_rate)
-        tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
-        epoch = 0
-        with torch.no_grad():
-            pesq, stoi, lsd, sisnr, visqol = evaluate(args, generator, tt_loader, epoch)
-        enhance(args, generator, args.samples_dir, tt_loader)
-
-        metrics = {'Average pesq': pesq, 'Average stoi': stoi, 'Average lsd': lsd,
-                        'Average sisnr': sisnr, 'Average visqol': visqol}
-        wandb.log(metrics, step=epoch)
-        info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
-        logger.info('-' * 70)
-        logger.info(bold(f"Overall Summary | Epoch {epoch + 1} | {info}"))
-
-        if args.log_results:
-            log_results(args)
-        return
 
     # torch also initialize cuda seed if available
     torch.manual_seed(args.seed)
